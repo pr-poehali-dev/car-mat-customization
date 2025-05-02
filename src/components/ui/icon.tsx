@@ -1,28 +1,39 @@
-import React from 'react';
-import * as LucideIcons from 'lucide-react';
-import { LucideProps } from 'lucide-react';
+
+import { LucideIcon, LucideProps } from "lucide-react";
+import dynamicIconImports from "lucide-react/dynamicIconImports";
+import { Suspense, lazy } from "react";
 
 interface IconProps extends LucideProps {
-  name: string;
-  fallback?: string;
+  name: keyof typeof dynamicIconImports | string;
+  fallback?: keyof typeof dynamicIconImports;
 }
 
-const Icon: React.FC<IconProps> = ({ name, fallback = 'CircleAlert', ...props }) => {
-  const IconComponent = (LucideIcons as Record<string, React.FC<LucideProps>>)[name];
-
-  if (!IconComponent) {
-    // Если иконка не найдена, используем fallback иконку
-    const FallbackIcon = (LucideIcons as Record<string, React.FC<LucideProps>>)[fallback];
-
-    // Если даже fallback не найден, возвращаем пустой span
-    if (!FallbackIcon) {
-      return <span className="text-xs text-gray-400">[icon]</span>;
-    }
-
-    return <FallbackIcon {...props} />;
+/**
+ * Lazy-loaded icon component that dynamically imports Lucide icons
+ */
+const Icon: React.FC<IconProps> = ({ name, fallback = "CircleAlert", ...props }) => {
+  let iconName = name as keyof typeof dynamicIconImports;
+  
+  // Check if the icon name exists in dynamicIconImports
+  const isValidIcon = Object.keys(dynamicIconImports).includes(iconName);
+  
+  // Use fallback if the requested icon doesn't exist
+  if (!isValidIcon) {
+    console.warn(`Icon "${name}" not found, using "${fallback}" as fallback`);
+    iconName = fallback;
   }
+  
+  const LazyIcon = lazy(async () => {
+    const module = await dynamicIconImports[iconName]();
+    // Type assertion to cast the imported module
+    return { default: module.default as LucideIcon };
+  });
 
-  return <IconComponent {...props} />;
+  return (
+    <Suspense fallback={<div className="w-5 h-5 animate-pulse bg-gray-200 rounded" />}>
+      <LazyIcon {...props} />
+    </Suspense>
+  );
 };
 
 export default Icon;
